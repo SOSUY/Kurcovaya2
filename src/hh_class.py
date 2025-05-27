@@ -1,54 +1,67 @@
-from abc import ABC, abstractmethod
-from typing import Any
-import requests
+class Vacancy:
+    """Класс для создания вакансий и работы с ними,
+    их можно сравнивать друг с другом, выводить в консоль,
+    а также все зарплаты валидируются в специальном приватном методе"""
 
+    __slots__ = ("__name", "url", "salary_from", "salary_to", "desc")
 
-class BaseAPIService(ABC):  # pragma: no cover
-    """Абстрактный базовый класс для сервисов API"""
+    def __init__(self, name:str, url:str, salary_from:int, salary_to:int, desc:str):
+        self.__name = name
+        self.url = url
+        self.salary_from = self._validate_salary(salary_from)
+        self.salary_to = self._validate_salary(salary_to)
+        self.desc = desc
 
-    @abstractmethod
-    def __init__(self):
-        pass
+    @property
+    def name(self) -> str:
+        return self.__name
 
-    @abstractmethod
-    def check_connection(self):
-        pass
+    def _validate_salary(self, value:int) -> int:
+        """Приватный валидатор суммы денег"""
+        if isinstance(value, (int, float)) and value > 0:
+            return value
+        return 0
 
-    @abstractmethod
-    def retrieve_vacancies(self, search_query: str, max_results: int = 100):
-        pass
+    def main_data(self) -> dict:
+        """Возвращает всю информацию о вакансии как в json файле для работы с ним"""
+        return {
+            "name": self.__name,
+            "alternate_url": self.url,
+            "salary_from": self.salary_from,
+            "salary_to": self.salary_to,
+            "snippet": {"requirement": self.desc},
+        }
 
+    def __str__(self) -> str:
+        """При вызове print или str для класса будет выводиться вся информация в красивом виде"""
+        return f"""    =========================================================================
+    Название: {self.__name}
+    Ссылка: {self.url}
+    Зарплата от {self.salary_from} до {self.salary_to}
+    Описание: {self.desc}
+    ========================================================================="""
 
-class HeadHunterService(BaseAPIService):
-    """Сервис для работы с API HeadHunter, получает данные о вакансиях в формате JSON"""
+    # Магические методы сравнения
+    def __eq__(self, other):
+        """Сравнение если два объекта класса равны"""
+        return self.salary_from == other.salary_from
 
-    def __init__(self):
-        self.api_endpoint = "https://api.hh.ru/vacancies"
+    def __ne__(self, other):
+        """Сравнение если два объекта класса не равны"""
+        return self.salary_from != other.salary_from
 
-    def _check_connection(self) -> bool:
-        """Проверяет подключение к API, отправляя тестовый запрос"""
-        response = requests.get(self.api_endpoint)
-        return response.status_code == 200
+    def __lt__(self, other):
+        """Сравнение если 2 объекта больше 1 объекта"""
+        return self.salary_from < other.salary_from
 
-    def retrieve_vacancies(self, search_query: str, max_results: int = 100) -> Any:
-        """Загружает вакансии по заданному запросу и ограничению количества записей"""
-        if hasattr(self, "_check_connection") and callable(getattr(self, "_check_connection")):
-            if getattr(self, "_check_connection")():
-                parameters = {
-                    "text": search_query,
-                    "per_page": max_results,
-                    "search_field": "name",
-                }
-                response = requests.get(url=self.api_endpoint, params=parameters)
-                return response.json()
-            else:
-                error_status = requests.get(
-                    url=self.api_endpoint,
-                    params={
-                        "text": search_query,
-                        "per_page": max_results,
-                        "search_field": "name",
-                    },
-                ).status_code
-                print(f"Произошла ошибка подключения: {error_status}")
-                return None
+    def __gt__(self, other):
+        """Сравнение если 1 объекта больше 2 объекта"""
+        return self.salary_from > other.salary_from
+
+    def __le__(self, other):
+        """Сравнение если 2 объекта больше или равен 1 объекту"""
+        return self.salary_from <= other.salary_from
+
+    def __ge__(self, other):
+        """Сравнение если 1 объекта больше или равен 2 объекта"""
+        return self.salary_from >= other.salary_from

@@ -5,102 +5,104 @@ from abc import ABC, abstractmethod
 from src.hh_class import Vacancy
 
 
-class DataSaverInterface(ABC):  # pragma: no cover
-    """Интерфейс для классов сохранения данных"""
+class BaseSave(ABC):  # pragma: no cover
+    """Базовый класс для File_Save"""
 
     @abstractmethod
-    def __init__(self, data, filename="vacancies"):
+    def __init__(self, data, name="vacancies"):
         self.data = data
-        self.filename = filename
+        self.__name = name
 
     @abstractmethod
-    def load_data(self):
+    def save_to_file(self):
         pass
 
     @abstractmethod
-    def store_data(self):
+    def read_file(self):
         pass
 
     @abstractmethod
-    def clear_data(self):
+    def delete_vacancies(self):
         pass
 
     @abstractmethod
-    def append_vacancy(self, vacancy):
+    def add_vacancy(self, vacancy):
         pass
 
 
-class JsonFileSaver(DataSaverInterface):
-    """Класс для сохранения данных в JSON-файл, позволяет считывать, очищать и добавлять отдельные вакансии"""
+class File_Save(BaseSave):
+    """Класс для сохранения данных в файл для дальнейшей работы с ним,
+    может также удалять все вакансии в файле, читать его, и добавлять вакансии отдельно"""
 
-    def __init__(self, data: dict, filename: str = "vacancies"):
+    def __init__(self, data:dict, name:str="vacancies"):
         self.data = data
-        self.filename = filename
+        self.__name = name
 
-    def load_data(self) -> dict:
-        """Читает данные из JSON-файла"""
+    def read_file(self) -> dict:
+        """Метод, который читает данные из json файла и выводит его"""
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "..", "data")
-        file_path = os.path.join(data_dir, f"{self.filename}.json")
-        with open(file_path, encoding="utf-8") as file:
-            return json.load(file)
+        file_path = os.path.join(data_dir, f"{self.__name}.json")
+        with open(file_path, encoding="utf-8") as r:
+            file = json.load(r)
+        return file
 
-    def store_data(self):
-        """Сохраняет новые вакансии в JSON-файл без повторений и перезаписи существующих данных"""
+    def save_to_file(self):
+        """Метод для сохранения информации в файл json без перезаписывания и дублирования"""
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "..", "data")
-        file_path = os.path.join(data_dir, f"{self.filename}.json")
-
-        existing_data = {}
+        file_path = os.path.join(data_dir, f"{self.__name}.json")
         if os.path.exists(file_path):
             try:
-                existing_data = self.load_data()
-                if not isinstance(existing_data, dict) or 'items' not in existing_data:
-                    existing_data = {"items": []}
+                old_data = self.read_file()
+                if not isinstance(old_data, dict) or 'items' not in old_data:
+                    old_data = {"items": []}
             except json.JSONDecodeError:
-                existing_data = {"items": []}
+                old_data = {"items": []}
         else:
-            existing_data = {"items": []}
+            old_data = {"items": []}
 
-        existing_vacancies = set((v["name"], v["url"]) for v in existing_data["items"])
-        updated_items = []
+        old_vacancies = {(item["name"], item["alternate_url"]) for item in old_data['items']}
+        new_data = []
+        for i in self.data["items"]:
+            salary_from = 0
+            salary_to = 0
 
-        for item in self.data["items"]:
-            salary_from = item.get("salary", {}).get("from", 0)
-            salary_to = item.get("salary", {}).get("to", 0)
-            requirement = item["snippet"]["requirement"]
-            vacancy_obj = Vacancy(item["name"], item["alternate_url"], salary_from, salary_to, requirement)
-            unique_key = (vacancy_obj.name, vacancy_obj.url)
+            if i.get("salary"):
+                salary_from = i["salary"].get("from") or 0
+                salary_to = i["salary"].get("to") or 0
 
-            if unique_key not in existing_vacancies:
-                updated_items.append(vacancy_obj.main_data())
-                existing_vacancies.add(unique_key)
+            vacancy = Vacancy(i["name"], i["alternate_url"], salary_from, salary_to, i["snippet"]["requirement"])
+            key = (vacancy.name,vacancy.url)
+            if key not in old_vacancies:
+                new_data.append(vacancy.main_data())
+                old_vacancies.add(key)
 
-        existing_data["items"].extend(updated_items)
+        old_data['items'].extend(new_data)
 
-        with open(file_path, "w", encoding="utf-8") as output_file:
-            json.dump(existing_data, output_file, ensure_ascii=False, indent=2)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(old_data, f, ensure_ascii=False, indent=2)
 
-    def clear_data(self):
-        """Очищает весь файл с вакансиями"""
+    def delete_vacancies(self):
+        """Метод удаляющий все данные из json файла"""
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "..", "data")
-        file_path = os.path.join(data_dir, f"{self.filename}.json")
-        with open(file_path, "w", encoding="utf-8") as empty_file:
-            json.dump({}, empty_file)
+        file_path = os.path.join(data_dir, f"{self.__name}.json")
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump({}, f)
 
-    def append_vacancy(self, vacancy: dict):
-        """Добавляет отдельную вакансию в существующий файл"""
+    def add_vacancy(self, vacancy:dict):
+        """Метод добавляющий отделённую вакансию в файл"""
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "..", "data")
-        file_path = os.path.join(data_dir, f"{self.filename}.json")
-
+        file_path = os.path.join(data_dir, f"{self.__name}.json")
         if isinstance(vacancy, Vacancy):
-            vacancy_dict = vacancy.main_data()
-            current_data = self.load_data()
-            if not any(v == vacancy_dict for v in current_data["items"]):
-                current_data["items"].append(vacancy_dict)
-            with open(file_path, "w", encoding="utf-8") as update_file:
-                json.dump(current_data, update_file, ensure_ascii=False, indent=2)
+            vacancy = vacancy.main_data()
+            with open(file_path, encoding="utf-8") as r:
+                data = json.load(r)
+            if not any(v == vacancy for v in data["items"]):
+                data["items"].append(vacancy)
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
         else:
-            print("Ошибка! Можно добавить только объект типа Vacancy.")
+            print("Можно добавлять только main_data из класса Vacancy")
