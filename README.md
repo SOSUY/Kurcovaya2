@@ -8,7 +8,7 @@
  
 1. Клонируйте репозиторий:
 ```
-https://github.com/TOLIKLOL777/hh_course
+https://github.com/SOSUY/Kurcovaya2.git
 ```
 2. Установите зависимости:
 ```
